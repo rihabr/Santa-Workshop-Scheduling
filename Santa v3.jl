@@ -3,14 +3,12 @@ using JuMP, Gurobi, DataFrames, CSV, Plots
 using Pkg
 Pkg.add(Pkg.PackageSpec(name="JuMP", version="0.18.6"))
 
-print("test")
 
 preferences = CSV.read("family_data.csv")
 fam_size = preferences[:,12]
 sort(fam_size,rev=true);
 
-#need to create vector such the 52nd entry has cost 0, 38th entry has cost 1 etc....
-#then, for the second family 100 + 26th entry has cost 0, 4th entry has cost 1 etc....
+#### Create Cost Vector for Preference Cost (Penalty Term #1)
 c = zeros(5000,100)
 
 for i=1:5000
@@ -58,7 +56,7 @@ for i=1:5000
     end
 end
 
-
+#### Calculate Preference Cost (Penalty Term #1)
 function calcPrefCost(x)
     
     sum(c[i,j]*x[i,j] for i =1:5000,j=1:100)
@@ -66,6 +64,7 @@ function calcPrefCost(x)
     return prefCost
 end
 
+#### Calculate Accounting Cost (Penalty Term #2)
 function calcAccountingCost(schedule)
     
     day = schedule[:,2]
@@ -87,6 +86,7 @@ function calcAccountingCost(schedule)
     return penalty
 end
 
+#### Optimization Formulation
     model = Model(solver=GurobiSolver(TimeLimit=60*10))
 
     #Decision Variables
@@ -108,10 +108,6 @@ end
     @constraint(model, [d=1:99], sum(N[d,i,j]*i for i=125:300, j=125:300)== sum(x[i,d]*fam_size[i] for i=1:5000))
     @constraint(model, [d=1:99], sum(N[d,i,j]*j for i=125:300, j=125:300)== sum(x[i,d+1]*fam_size[i] for i=1:5000))
 
-    @constraint(model, sum(c[i,j]*x[i,j] for i =1:5000,j=1:100)+ 
-    sum( ( ((i - 125)/400) * i^(0.5 + (abs(i-j)/50 )) )*N[d,i,j] for d=1:99,i=125:300,j=125:300)  
-    + sum( ( ((j - 125)/400) * j^(0.5 + (abs(j-j)/50 )) )*N[99,i,j] for i=125:300,j=125:300) >= 68800)
-    
     # objective function
     @objective(model, Min, sum(c[i,j]*x[i,j] for i =1:5000,j=1:100)+ 
     sum( ( ((i - 125)/400) * i^(0.5 + (abs(i-j)/50 )) )*N[d,i,j] for d=1:99,i=125:300,j=125:300)  
@@ -124,7 +120,7 @@ end
     x = getvalue(x);
     totalCost = getobjectivevalue(model)
 
-
+### Function for  santa's schedule
 function createSchedule(x)
     
     submission = zeros(5000,1)
@@ -151,17 +147,7 @@ sched = createSchedule(x)
 accCost = calcAccountingCost(sched)
 totalCost = prefCost+accCost
 
-x
 
 submission_final = convert(DataFrame, sched)
 CSV.write("submission_VR_5.csv", submission_final, header=["family_id","assigned_day"])
-
-sched =  CSV.read("best_submission.csv");
-
-x = convert(DataFrame, x)
-CSV.write("test.csv", x)
-
-x = DataFrame(A = 1:4, B = ["M", "F", "F", "M"])
-CSV.write("test.csv", x)
-
 
