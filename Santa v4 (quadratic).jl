@@ -1,13 +1,14 @@
 using JuMP, Gurobi, DataFrames, CSV, Plots
 
+using Pkg
+Pkg.add(Pkg.PackageSpec(name="JuMP", version="0.18.6"))
+
+
 preferences = CSV.read("family_data.csv")
 fam_size = preferences[:,12]
-fam_size[2]
+sort(fam_size,rev=true);
 
-min(6,8)
-
-#need to create vector such the 52nd entry has cost 0, 38th entry has cost 1 etc....
-#then, for the second family 100 + 26th entry has cost 0, 4th entry has cost 1 etc....
+#### Create Cost Vector for Preference Cost (Penalty Term #1)
 c = zeros(5000,100)
 
 for i=1:5000
@@ -55,7 +56,7 @@ for i=1:5000
     end
 end
 
-
+#### Calculate Preference Cost (Penalty Term #1)
 function calcPrefCost(x)
     
     sum(c[i,j]*x[i,j] for i =1:5000,j=1:100)
@@ -63,6 +64,7 @@ function calcPrefCost(x)
     return prefCost
 end
 
+#### Calculate Accounting Cost (Penalty Term #2)
 function calcAccountingCost(schedule)
     
     day = schedule[:,2]
@@ -84,17 +86,7 @@ function calcAccountingCost(schedule)
     return penalty
 end
 
-    model = Model(solver=GurobiSolver(TimeLimit=60*4))
-    @variable(model, x)
-    @variable(model, y)
-
-    @constraint(model, 5x+3y<=3) 
-
-    @objective(model, Min, x+y)
-
-solve(model)
-
-
+#### Optimization Formulation
     model = Model(solver=GurobiSolver(TimeLimit=60*4))
 
     #Decision Variables
@@ -127,6 +119,7 @@ solve(model)
     totalCost = getobjectivevalue(model)
 
 
+### Function for  santa's schedule
 function createSchedule(x)
     
     submission = zeros(5000,1)
@@ -153,17 +146,7 @@ sched = createSchedule(x)
 accCost = calcAccountingCost(sched)
 totalCost = prefCost+accCost
 
-x
 
 submission_final = convert(DataFrame, sched)
 CSV.write("submission_VR_5.csv", submission_final, header=["family_id","assigned_day"])
-
-sched =  CSV.read("best_submission.csv");
-
-x = convert(DataFrame, x)
-CSV.write("test.csv", x)
-
-x = DataFrame(A = 1:4, B = ["M", "F", "F", "M"])
-CSV.write("test.csv", x)
-
 
